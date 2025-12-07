@@ -1,25 +1,28 @@
 #include "func_web.h"
+#include <stdio.h>
 
-byte a, x, y;
-uint16_t pc;
-byte stackpointer;
-byte data;
-byte flags;
-uint16_t address;
-byte memory[0x10000];
+byte a = 0;
+byte x = 0;
+byte y = 0;
+uint16_t pc = 0;
+byte stackpointer = 0xFF;
+byte flags = 0x20; // Interrupt flag set on reset
+byte memory[0x10000] = {0};
 
 void reset_cpu(){
-  a = 0;
-  x = 0;
-  y = 0;
-  stackpointer = 0xFF;
+    printf("reset_cpu: Starting reset\n");
+    a = 0;
+    x = 0;
+    y = 0;
+    stackpointer = 0xFF;
+    flags = 0x20; // Interrupt flag set
 
-  for(int i=0; i<0xFFFF; i++){
-    memory[i] = 0;
-  }
-
-  pc = (memory[0xFFFD] << 8) | memory[0xFFFC];
+  
+    pc = (memory[0xFFFD] << 8) | memory[0xFFFC];
+    
+    printf("reset_cpu: Complete. PC=%04x, A=%02x, flags=%02x\n", pc, a, flags);
 }
+
 
 byte read_byte(byte *address){
   return (*address);
@@ -48,22 +51,16 @@ void set_pc(uint16_t value){
 }
 
 uint8_t execute_instruction(){
-  /*
-   *   Instructions for the 65c02 usually follow a set pattern:
-   *      - always 8 bits
-   *      - Group 1-3 instructions are of the form aaabbbcc
-   *      - aaa are the upper 3 bits, these with cc determine the instruction
-   *      - bbb are bits 2-4, these determine the addressing mode
-   *
-   *      - Single byte instructions have some weirder patterns
-   *      - Interrupt expressions are of the form 0aa0 0000 (bbb = 0, cc = 0)
-   *      - Bit set/clear, push/pull, increment, transfer ops have aaaa 1000
-   *          (bbb=2, cc=0)
-   *      - 
-   */
 
+
+  printf("execute_instruction: PC=%04x\n", pc);
   uint8_t opcode = read_pc();
-  if(opcode == 0) return 0;
+  printf("execute_instruction: Read opcode %02x, PC now %04x\n", opcode, pc);
+  
+  if(opcode == 0) {
+    printf("execute_instruction: BRK encountered\n");
+    return 0;
+  }
 
   uint8_t high = opcode >> 4;
   uint8_t low = opcode & 0xF;
@@ -129,6 +126,8 @@ uint8_t execute_instruction(){
         break;
     }
   }
+  
+  printf("execute_instruction: After execution A=%02x, X=%02x, Y=%02x\n", a, x, y);
   return opcode;
 }
 
@@ -147,7 +146,6 @@ byte* decode_addrmode_group1(byte addrmode){
       break;
     
     case 1:        // zero page
-      // TODO: check this
       address = read_pc();
       break;
     
@@ -156,7 +154,6 @@ byte* decode_addrmode_group1(byte addrmode){
       break;
     
     case 3:        // absolute
-      // TODO: Are these stored little endian? I think so but unsure
       address = read_address(pc);
       pc += 2;
       break;
@@ -238,6 +235,7 @@ byte* decode_addrmode_group23(byte addrmode, byte highbits){
   Runs an instruction from Group 1
 */
 void run_instruction_group1(byte *address, uint8_t highbits){
+  printf("run_instruction_group1: highbits=%d\n", highbits);
   switch(highbits){
     case 0:
       ORA(address);
@@ -256,6 +254,7 @@ void run_instruction_group1(byte *address, uint8_t highbits){
       break;
     case 5:
       LDA(address);
+      printf("LDA: A is now %02x\n", a);
       break;
     case 6:
       CMP(address);
@@ -332,10 +331,7 @@ void run_instruction_group3(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs a branching instruction
-  BRA is currently not supported
-*/
+
 void run_instruction_branching(uint8_t highbits){
   // All branching instructions use relative addressing
   // This is a SIGNED 8 bit integer
@@ -370,7 +366,6 @@ void run_instruction_branching(uint8_t highbits){
 
   // Branch if flag is equal to value
   if( ((flags & (1 << shift)) > 0) == value ){
-    //pc = addr;
     set_pc(addr);
   }
 
@@ -378,14 +373,7 @@ void run_instruction_branching(uint8_t highbits){
 }
 
 
-/*
-  Runs a single-byte instruction of the form 0xN8
-  (N any number)
-*/
 void run_instruction_sbyte1(uint8_t highbits){
-  // This is really verbose
-  // Maybe I can come up with a smarter way to do it later
-  // This implementation feels intuitive if a bit long
   switch(highbits){
     // Push/Pull operations
     case 0:
@@ -460,14 +448,10 @@ void run_instruction_sbyte1(uint8_t highbits){
   return;
 }
 
-/*
-  Runs a single-byte instruction of the form 0xNA
-  (N any number >= 8)
-*/
+
 void run_instruction_sbyte2(uint8_t highbits){
   switch(highbits){
-    // Highbits will always be at least 8 for 6502
-    // 65C02 instructions add lower bit values
+
     case 1:
       // INC (INA)
       INC(&a);
@@ -552,7 +536,6 @@ void run_instruction_interrupt(uint8_t highbits){
 bool try65C02opcode(uint8_t opcode){
   byte *addr;
   uint8_t code = opcode;
-  // This approach is a little hacky, but it's the best way I could implement it
   switch(opcode){
     // STZ instructions (0x9E is handled elsewhere)
     case 0x9C:
