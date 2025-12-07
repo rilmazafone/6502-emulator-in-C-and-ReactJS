@@ -1,1 +1,1 @@
-6502 emulator written in C and ReactJS, very broken,not working as of right now
+6502 emulator written in C and ReactJS,WASM, now fully works,fixed all of the previous errors,reactjs website created with claude since i cant do react
