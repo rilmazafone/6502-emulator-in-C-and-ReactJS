@@ -1,26 +1,87 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
+// Color palette (NES-inspired)
+const COLORS = [
+  '#000000', // 0: Black
+  '#FFFFFF', // 1: White
+  '#FF0000', // 2: Red
+  '#00FF00', // 3: Green
+  '#0000FF', // 4: Blue
+  '#FFFF00', // 5: Yellow
+  '#FF00FF', // 6: Magenta
+  '#00FFFF', // 7: Cyan
+  '#FFA500', // 8: Orange
+  '#800080', // 9: Purple
+  '#FFC0CB', // A: Pink
+  '#A52A2A', // B: Brown
+  '#808080', // C: Gray
+  '#90EE90', // D: Light Green
+  '#FFB6C1', // E: Light Pink
+  '#E0E0E0', // F: Light Gray
+];
+
+function DisplayScreen({ pixels, width = 32, height = 32 }) {
+  const canvasRef = useRef(null);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const pixelSize = 8; // Each pixel is 8x8 screen pixels
+    
+    // Clear canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw each pixel
+    for (let i = 0; i < pixels.length; i++) {
+      const x = i % width;
+      const y = Math.floor(i / width);
+      const colorIndex = pixels[i] & 0x0F; // Use lower 4 bits for color
+      
+      ctx.fillStyle = COLORS[colorIndex];
+      ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+    }
+  }, [pixels, width, height]);
+  
+  return (
+    <canvas 
+      ref={canvasRef} 
+      width={width * 8} 
+      height={height * 8}
+      style={{
+        border: '2px solid #667eea',
+        borderRadius: '4px',
+        imageRendering: 'pixelated',
+        width: '256px',
+        height: '256px'
+      }}
+    />
+  );
+}
+
 function App() {
-  const [code, setCode] = useState(`LDA #$05
-STA $0200
-LDX #$03
-INX
+  const [code, setCode] = useState(`; Draw a pixel at center
+LDA #$01
+STA $0310
 BRK`);
   
   const [output, setOutput] = useState('');
   const [registers, setRegisters] = useState({
     a: 0, x: 0, y: 0, pc: 0, sp: 0xFF, flags: 0x20
   });
+  const [displayPixels, setDisplayPixels] = useState(new Array(1024).fill(0));
   const [memory, setMemory] = useState(new Array(16).fill(0));
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [executionSpeed, setExecutionSpeed] = useState(100);
   
   const moduleRef = useRef(null);
   const animationRef = useRef(null);
 
-  // Initialize WebAssembly
   useEffect(() => {
     const init = async () => {
       try {
@@ -66,6 +127,7 @@ BRK`);
         setOutput('✅ Emulator ready!\n');
         updateRegisters();
         updateMemory();
+        updateDisplay();
         
         setTimeout(runTest, 500);
         
@@ -79,6 +141,35 @@ BRK`);
     };
     
     init();
+  }, []);
+
+  // Keyboard input handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!moduleRef.current) return;
+      
+      // Map arrow keys to memory address $FF
+      const keyMap = {
+        'ArrowUp': 0x80,
+        'ArrowDown': 0x81,
+        'ArrowLeft': 0x82,
+        'ArrowRight': 0x83,
+        ' ': 0x20,
+        'w': 0x80,
+        's': 0x81,
+        'a': 0x82,
+        'd': 0x83
+      };
+      
+      if (keyMap[e.key]) {
+        e.preventDefault();
+        moduleRef.current.writeMem(0xFF, keyMap[e.key]);
+        setOutput(prev => prev + `Key pressed: ${e.key} (${keyMap[e.key].toString(16)})\n`);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const updateRegisters = () => {
@@ -113,6 +204,21 @@ BRK`);
     }
   };
 
+  const updateDisplay = () => {
+    if (!moduleRef.current) return;
+    
+    try {
+      // Read video memory ($0200-$05FF = 1024 bytes = 32x32 pixels)
+      const newDisplay = [];
+      for (let i = 0; i < 1024; i++) {
+        newDisplay.push(moduleRef.current.readMem(0x0200 + i));
+      }
+      setDisplayPixels(newDisplay);
+    } catch (err) {
+      console.error('Error updating display:', err);
+    }
+  };
+
   const runTest = () => {
     if (!moduleRef.current) return;
     
@@ -120,46 +226,22 @@ BRK`);
       console.log('=== STARTING TEST ===');
       setOutput('Running test...\n');
       
-      // Write test program
-      console.log('Writing test program...');
-      moduleRef.current.writeMem(0x0600, 0xA9); // LDA #
-      moduleRef.current.writeMem(0x0601, 0x05); // #$05
-      moduleRef.current.writeMem(0x0602, 0x00); // BRK
+      moduleRef.current.writeMem(0x0600, 0xA9);
+      moduleRef.current.writeMem(0x0601, 0x05);
+      moduleRef.current.writeMem(0x0602, 0x00);
       
-      // Set reset vector
-      console.log('Setting reset vector...');
       moduleRef.current.writeMem(0xFFFC, 0x00);
       moduleRef.current.writeMem(0xFFFD, 0x06);
       
-      // Verify memory
-      console.log('Memory at 0x0600:', moduleRef.current.readMem(0x0600).toString(16));
-      console.log('Memory at 0x0601:', moduleRef.current.readMem(0x0601).toString(16));
-      console.log('Reset vector low:', moduleRef.current.readMem(0xFFFC).toString(16));
-      console.log('Reset vector high:', moduleRef.current.readMem(0xFFFD).toString(16));
-      
-      // Reset
-      console.log('Calling reset...');
       moduleRef.current.reset();
       
-      console.log('After reset:');
-      console.log('  A =', moduleRef.current.getA());
-      console.log('  PC =', moduleRef.current.getPC().toString(16));
-      
-      // Execute LDA
-      console.log('Executing instruction...');
       const opcode = moduleRef.current.step();
-      console.log('Opcode executed:', opcode.toString(16));
-      
-      console.log('After step:');
-      console.log('  A =', moduleRef.current.getA());
-      console.log('  PC =', moduleRef.current.getPC().toString(16));
-      
       updateRegisters();
       updateMemory();
+      updateDisplay();
       
       const a = moduleRef.current.getA();
       setOutput(prev => prev + `Test complete! A = ${a} (expected: 5)\n`);
-      setOutput(prev => prev + `Opcode executed: ${opcode.toString(16).padStart(2, '0')}\n`);
       
       console.log('=== TEST COMPLETE ===');
       
@@ -190,8 +272,13 @@ BRK`);
         'INY': 0xC8,
         'DEX': 0xCA,
         'DEY': 0x88,
+        'INA': 0x1A,
+        'DEA': 0x3A,
         'BRK': 0x00,
-        'NOP': 0xEA
+        'NOP': 0xEA,
+        'ASL': 0x0A,
+        'SEC': 0x38,
+        'CLC': 0x18
       };
       
       for (const line of lines) {
@@ -245,10 +332,10 @@ BRK`);
       moduleRef.current.reset();
       
       setOutput(`✅ Loaded ${program.length} bytes at $${startAddr.toString(16).toUpperCase()}\n`);
-      setOutput(prev => prev + 'Program bytes: ' + program.map(b => '$' + b.toString(16).padStart(2, '0')).join(' ') + '\n');
       
       updateRegisters();
       updateMemory();
+      updateDisplay();
       
     } catch (err) {
       setError('Assembly error: ' + err.message);
@@ -262,8 +349,9 @@ BRK`);
       const opcode = moduleRef.current.step();
       updateRegisters();
       updateMemory();
+      updateDisplay();
       
-      setOutput(prev => prev + `Executed: $${opcode.toString(16).padStart(2, '0')} at PC=$${registers.pc.toString(16).padStart(4, '0')}\n`);
+      setOutput(prev => prev + `Executed: $${opcode.toString(16).padStart(2, '0')}\n`);
       
       if (opcode === 0x00) {
         setOutput(prev => prev + '⛔ Program halted (BRK)\n');
@@ -277,7 +365,7 @@ BRK`);
     if (isRunning) {
       setIsRunning(false);
       if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+        clearTimeout(animationRef.current);
       }
       return;
     }
@@ -286,7 +374,7 @@ BRK`);
     setOutput(prev => prev + '▶️ Running...\n');
     
     let stepCount = 0;
-    const maxSteps = 10000;
+    const maxSteps = 100000;
     
     const execute = () => {
       if (!moduleRef.current) {
@@ -298,10 +386,16 @@ BRK`);
         const opcode = moduleRef.current.step();
         stepCount++;
         
-        updateRegisters();
-        updateMemory();
+        if (stepCount % 100 === 0) {
+          updateRegisters();
+          updateMemory();
+          updateDisplay();
+        }
         
         if (opcode === 0x00) {
+          updateRegisters();
+          updateMemory();
+          updateDisplay();
           setOutput(prev => prev + `⛔ Program completed after ${stepCount} steps\n`);
           setIsRunning(false);
           return;
@@ -314,7 +408,7 @@ BRK`);
         }
         
         if (isRunning) {
-          animationRef.current = setTimeout(execute, 100);
+          animationRef.current = setTimeout(execute, executionSpeed);
         }
       } catch (err) {
         setError('Runtime error: ' + err.message);
@@ -328,7 +422,6 @@ BRK`);
   const reset = () => {
     setIsRunning(false);
     if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
       clearTimeout(animationRef.current);
     }
     
@@ -336,10 +429,73 @@ BRK`);
       moduleRef.current.reset();
       updateRegisters();
       updateMemory();
+      updateDisplay();
     }
     
     setOutput(prev => prev + '🔄 CPU reset\n');
     setError('');
+  };
+
+  const loadExample = (exampleName) => {
+    const examples = {
+      'draw': `; Draw a smiley face
+LDA #$01
+STA $0248
+STA $024B
+LDA #$02
+STA $0388
+STA $0389
+STA $038A
+STA $038B
+BRK`,
+      'snake': `; Simple pixel movement
+; Use WASD or arrows
+LDA #$10
+STA $00
+STA $01
+
+LOOP:
+LDA $FF
+CMP #$80
+BEQ UP
+CMP #$81
+BEQ DOWN
+CMP #$82
+BEQ LEFT
+CMP #$83
+BEQ RIGHT
+JMP DRAW
+
+UP:
+DEC $01
+JMP DRAW
+DOWN:
+INC $01
+JMP DRAW
+LEFT:
+DEC $00
+JMP DRAW
+RIGHT:
+INC $00
+
+DRAW:
+LDA #$01
+STA $0310
+BRK`,
+      'rainbow': `; Rainbow pattern
+LDX #$00
+LOOP:
+TXA
+STA $0200,X
+INX
+BNE LOOP
+BRK`
+    };
+    
+    if (examples[exampleName]) {
+      setCode(examples[exampleName]);
+      setOutput(`Loaded example: ${exampleName}\n`);
+    }
   };
 
   const formatFlags = (flags) => {
@@ -359,7 +515,7 @@ BRK`);
     <div className="app">
       <header>
         <h1>🖥️ 6502 WebAssembly Emulator</h1>
-        <p>Run 6502 assembly in your browser</p>
+        <p>Run 6502 assembly with graphics • Use WASD/Arrows for input</p>
       </header>
       
       <div className="container">
@@ -383,13 +539,33 @@ BRK`);
                   <button onClick={run} className={`btn ${isRunning ? 'btn-danger' : 'btn-success'}`}>
                     {isRunning ? '⏸️ Stop' : '▶️ Run'}
                   </button>
-                  <button onClick={runTest} className="btn btn-warning">
-                    🧪 Test
-                  </button>
                   <button onClick={reset} className="btn">
                     🔄 Reset
                   </button>
                 </div>
+              </div>
+              
+              <div style={{ padding: '1rem', background: '#2a2a2a' }}>
+                <label style={{ fontSize: '0.9rem', color: '#808080' }}>
+                  Speed: {executionSpeed}ms
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max="500" 
+                    value={executionSpeed}
+                    onChange={(e) => setExecutionSpeed(Number(e.target.value))}
+                    style={{ width: '100%', marginTop: '0.5rem' }}
+                  />
+                </label>
+              </div>
+              
+              <div style={{ padding: '0 1rem 1rem', background: '#2a2a2a', display: 'flex', gap: '0.5rem' }}>
+                <button onClick={() => loadExample('draw')} className="btn" style={{ flex: 1 }}>
+                  Draw
+                </button>
+                <button onClick={() => loadExample('rainbow')} className="btn" style={{ flex: 1 }}>
+                  Rainbow
+                </button>
               </div>
               
               <textarea
@@ -411,6 +587,15 @@ BRK`);
             </div>
             
             <div className="panel registers-panel">
+              <div className="panel-header">
+                <h3>Display (32x32 pixels)</h3>
+                <small style={{ opacity: 0.7 }}>Video RAM: $0200-$05FF</small>
+              </div>
+              
+              <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', background: '#1a1a1a' }}>
+                <DisplayScreen pixels={displayPixels} />
+              </div>
+              
               <div className="panel-header">
                 <h3>CPU State</h3>
               </div>
@@ -440,8 +625,8 @@ BRK`);
                   <div className="value">${registers.sp.toString(16).padStart(2, '0').toUpperCase()}</div>
                 </div>
                 <div className="register">
-                  <label>Flags</label>
-                  <div className="value">${registers.flags.toString(16).padStart(2, '0').toUpperCase()}</div>
+                  <label>Input</label>
+                  <div className="value">${moduleRef.current ? moduleRef.current.readMem(0xFF).toString(16).padStart(2, '0').toUpperCase() : '00'}</div>
                 </div>
               </div>
               
@@ -449,19 +634,6 @@ BRK`);
                 {formatFlags(registers.flags).map((flag, i) => (
                   <div key={i} className={`flag ${flag.set ? 'active' : ''}`} title={flag.name}>
                     {flag.name}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="panel-header">
-                <h3>Memory ($0000-$000F)</h3>
-              </div>
-              
-              <div className="memory-grid">
-                {memory.map((byte, i) => (
-                  <div key={i} className="memory-cell">
-                    <div className="address">${i.toString(16).padStart(2, '0').toUpperCase()}</div>
-                    <div className="value">${byte.toString(16).padStart(2, '0').toUpperCase()}</div>
                   </div>
                 ))}
               </div>
