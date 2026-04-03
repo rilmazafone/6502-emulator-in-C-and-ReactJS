@@ -6,14 +6,12 @@
 
 typedef uint8_t byte;
 
-// Add function declarations that operations.c needs
 void write_byte(byte *address, byte value);
 byte read_byte(byte *address);
 uint16_t read_address(uint16_t offset);
 byte read_pc();
 void set_pc(uint16_t value);
 
-// Helper functions for 16-bit stack operations
 void push_word(uint16_t value);
 uint16_t pull_word(void);
 void push_pc(void);
