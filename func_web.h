@@ -8,7 +8,6 @@
 #include "registers.h"
 #include "operations.h"
 
-// For web builds, we don't need sleep/timing
 #ifdef __EMSCRIPTEN__
   #define sleep_ns(x)
   #define CLOCK_TIME 0
