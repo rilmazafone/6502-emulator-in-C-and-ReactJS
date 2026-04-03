@@ -124,11 +124,7 @@ uint8_t execute_instruction(){
   return opcode;
 }
 
-/*
-  Helper function to get the address corresponding to the addressing mode
-  Later functions will actually read/write to this line
-  These are for group 1 (cc == 01 opcodes) instructions
-*/
+
 byte* decode_addrmode_group1(byte addrmode){
   uint16_t address;
   switch (addrmode){
@@ -148,7 +144,6 @@ byte* decode_addrmode_group1(byte addrmode){
       break;
     
     case 3:        // absolute
-      // TODO: Are these stored little endian? I think so but unsure
       address = read_address(pc);
       pc += 2;
       break;
@@ -179,12 +174,6 @@ byte* decode_addrmode_group1(byte addrmode){
   return address+memory;
 }
 
-/*
-  Helper function to get the address corresponding to the addressing mode
-  Later functions will actually read/write to this line
-  These are for Group 2/3 (cc == 10,00 opcodes) instructions 
-  that aren't single-byte instructions
-*/
 byte* decode_addrmode_group23(byte addrmode, byte highbits){
   uint16_t address;
   switch(addrmode){
@@ -226,9 +215,6 @@ byte* decode_addrmode_group23(byte addrmode, byte highbits){
   return (memory+address);
 }
 
-/*
-  Runs an instruction from Group 1
-*/
 void run_instruction_group1(byte *address, uint8_t highbits){
   switch(highbits){
     case 0:
@@ -260,9 +246,7 @@ void run_instruction_group1(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs an instruction from Group 2
-*/
+
 void run_instruction_group2(byte *address, uint8_t highbits){
   switch(highbits){
     case 0:
@@ -293,13 +277,9 @@ void run_instruction_group2(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs an instruction from Group 3
-*/
+
 void run_instruction_group3(byte *address, uint8_t highbits){
   switch(highbits){
-    // case 0:
-    //    No case 0
     case 1:
       BIT(address);
       break;
@@ -324,13 +304,8 @@ void run_instruction_group3(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs a branching instruction
-  BRA is currently not supported
-*/
+
 void run_instruction_branching(uint8_t highbits){
-  // All branching instructions use relative addressing
-  // This is a SIGNED 8 bit integer
   int8_t offset = read_pc();
   uint16_t addr = pc + offset;
   uint8_t shift = 0;
@@ -370,14 +345,8 @@ void run_instruction_branching(uint8_t highbits){
 }
 
 
-/*
-  Runs a single-byte instruction of the form 0xN8
-  (N any number)
-*/
+
 void run_instruction_sbyte1(uint8_t highbits){
-  // This is really verbose
-  // Maybe I can come up with a smarter way to do it later
-  // This implementation feels intuitive if a bit long
   switch(highbits){
     // Push/Pull operations
     case 0:
@@ -452,14 +421,8 @@ void run_instruction_sbyte1(uint8_t highbits){
   return;
 }
 
-/*
-  Runs a single-byte instruction of the form 0xNA
-  (N any number >= 8)
-*/
 void run_instruction_sbyte2(uint8_t highbits){
   switch(highbits){
-    // Highbits will always be at least 8 for 6502
-    // 65C02 instructions add lower bit values
     case 1:
       // INC (INA)
       INC(&a);
@@ -513,12 +476,7 @@ void run_instruction_sbyte2(uint8_t highbits){
   return;
 }
 
-/*
-  Runs one of the interrupt instructions
-*/
 void run_instruction_interrupt(uint8_t highbits){
-  // These will all be of the form 0aa0 0000
-  // we're passing in upper three bits (aaa0 0000)
   switch(highbits){
     case 0:  
       BRK();
@@ -537,19 +495,13 @@ void run_instruction_interrupt(uint8_t highbits){
   return;
 }
 
-
-/*
-  Tries to execute one of the expanded 65C02 opcodes
-*/
 bool try65C02opcode(uint8_t opcode){
   byte *addr;
   uint8_t code = opcode;
-  // This approach is a little hacky, but it's the best way I could implement it
   switch(opcode){
-    // STZ instructions (0x9E is handled elsewhere)
     case 0x9C:
       // abs
-      code = 0x8C; // Convert bbb to 3 for abs indexing
+      code = 0x8C;
     case 0x64:
       // zp
     case 0x74:
