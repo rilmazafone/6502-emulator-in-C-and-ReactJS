@@ -1,6 +1,5 @@
 #include "operations.h"
 
-// Fix memory access for web builds
 byte* get_memory_ptr() {
     return memory;
 }
@@ -30,7 +29,6 @@ void ADC(byte *addr){
     uint16_t sum = a + (*addr) + (flags & 1);
     uint8_t res = sum & 0xFF;
     
-    // Set overflow flag: (~(a ^ *addr) & (a ^ res) & 0x80) != 0
     uint8_t overflow = (~(a ^ *addr) & (a ^ res) & 0x80) != 0;
     
     a = res;
@@ -63,12 +61,10 @@ void CMP(byte *addr){
 }
 
 void SBC(byte *addr){
-    // Invert operand and add with carry
     uint8_t operand = ~(*addr);
     uint16_t sum = a + operand + (flags & 1);
     uint8_t res = sum & 0xFF;
     
-    // Set overflow flag: ((a ^ res) & (operand ^ res) & 0x80) != 0
     uint8_t overflow = ((a ^ res) & (~(*addr) ^ res) & 0x80) != 0;
     
     a = res;
@@ -212,7 +208,6 @@ void pull_from_stack(byte *registerptr){
     uint16_t offset = 0x100 | stackpointer;
     *registerptr = memory[offset];
     
-    // Only update NZ flags for A, X, Y
     if(registerptr != &flags && registerptr != &stackpointer){
         flags = (flags & 0x7D) | 
                 ((*registerptr & 0x80)) |           // N
@@ -242,7 +237,6 @@ void push_word(uint16_t value){
     push_to_stack(&lo);
 }
 
-// Pull a 16-bit value from stack (low byte first)
 uint16_t pull_word(void){
     byte lo, hi;
     pull_from_stack(&lo);
@@ -250,47 +244,39 @@ uint16_t pull_word(void){
     return (hi << 8) | lo;
 }
 
-// Push PC to stack (for interrupts)
 void push_pc(void){
     push_word(pc);
 }
 
-// Pull PC from stack (for returns)
 uint16_t pull_pc(void){
     return pull_word();
 }
 
 void NOP(){
-    // No operation
+
 }
 
 void BRK(){
-   // Set break flag and interrupt flag
-    flags |= 0x10; // Set B flag (bit 4)
-    flags |= 0x04; // Set I flag (bit 2)
-    
-    // Push PC+2 (return address) onto stack
-    // The BRK instruction pushes PC+2, not PC
-    uint16_t return_addr = pc + 1; // PC already points to next instruction after BRK opcode
+    flags |= 0x10;
+    flags |= 0x04;
+
+    uint16_t return_addr = pc + 1;
     byte hi = (return_addr >> 8) & 0xFF;
     byte lo = return_addr & 0xFF;
     
     push_to_stack(&hi);
     push_to_stack(&lo);
     
-    // Push flags onto stack
-    byte status = flags | 0x30; // Set B and unused bits
+    byte status = flags | 0x30;
     push_to_stack(&status);
     
-    // Jump to interrupt vector
     pc = (memory[0xFFFF] << 8) | memory[0xFFFE];
 }
 
 void JSR(){
     uint16_t target = (memory[pc+1] << 8) | memory[pc];
     
-    // Push return address - 1? Actually JSR pushes PC+2 - 1 = PC+1
-    uint16_t return_addr = pc + 2; // Skip the 2-byte address operand
+    uint16_t return_addr = pc + 2;
     byte hi = (return_addr >> 8) & 0xFF;
     byte lo = return_addr & 0xFF;
     
@@ -301,13 +287,10 @@ void JSR(){
 }
 
 void RTI(){
-    // Pull flags and PC
   byte status;
     pull_from_stack(&status);
-    // Clear B flag and unused bits
-    flags = (status & ~0x30) | 0x20; // Clear B and unused, set I flag
+    flags = (status & ~0x30) | 0x20;
     
-    // Pull PC
     byte lo, hi;
     pull_from_stack(&lo);
     pull_from_stack(&hi);
