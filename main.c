@@ -52,8 +52,8 @@ void memory_explorer(){
   }
   clear();
   noecho();
-  cbreak(); /* Line buffering disabled. pass on everything */
-  curs_set(0); // turn off cursor
+  cbreak();
+  curs_set(0);
     
   mem_win = newwin(0, 0, 0, 0);
   keypad(mem_win, TRUE);
