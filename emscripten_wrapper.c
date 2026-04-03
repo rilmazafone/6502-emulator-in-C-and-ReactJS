@@ -2,18 +2,15 @@
 #include <stdio.h>
 #include "registers.h"
 
-// Forward declare the functions from func_web.c
 void reset_cpu();
 uint8_t execute_instruction();
 
-// Test to see if we can access globals
 EMSCRIPTEN_KEEPALIVE
 void js_debug_print() {
     printf("Debug: a=%d, x=%d, y=%d, pc=%d, sp=%d, flags=%d\n", 
            a, x, y, pc, stackpointer, flags);
 }
 
-// Export functions to JavaScript
 EMSCRIPTEN_KEEPALIVE
 void js_init() {
     printf("js_init called\n");
