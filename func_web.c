@@ -64,15 +64,14 @@ uint8_t execute_instruction(){
 
   uint8_t high = opcode >> 4;
   uint8_t low = opcode & 0xF;
-  // Check for single byte instructions first since they're easy
   if (low == 8){
     run_instruction_sbyte1(high);
   } else if (low == 0xA){
     run_instruction_sbyte2(high);
   } else {
-    uint8_t cc  = opcode & 0x03;             // AND with 0000 0011 = 0x03
-    uint8_t bbb = (opcode & 0x1C) >> 2;      // AND with 0001 1100 = 0x1C
-    uint8_t aaa = (opcode & 0xE0) >> 5;      // AND with 1110 0000 = 0xE0
+    uint8_t cc  = opcode & 0x03;
+    uint8_t bbb = (opcode & 0x1C) >> 2; 
+    uint8_t aaa = (opcode & 0xE0) >> 5;
     byte *address;
     switch(cc){
       case 1:
@@ -96,22 +95,15 @@ uint8_t execute_instruction(){
         }
         break;
       case 0:
-        // check for some 65C02 opcodes here
         if (try65C02opcode(opcode)) break;
 
-        // cc == 0 is a little funky since it also includes branching and interrupts
         if (bbb == 4 || opcode == 0x80){
-          // Branching instructions are all aaa 100 00
-          // BRA is 0x80
           run_instruction_branching(high);
 
         } else if (bbb == 0 && !(aaa & 0x4)){
-          // interrupt expressions are all 0aa 000 00
           run_instruction_interrupt(aaa);
 
         } else {
-          // If we made it here, it's a standard Group 3 instruction
-          // (pass zero because the check for group 2 STX/LDX shouldn't execute)
           address = decode_addrmode_group23(bbb, 0); 
           run_instruction_group3(address, aaa);
         }
@@ -131,11 +123,6 @@ uint8_t execute_instruction(){
   return opcode;
 }
 
-/*
-  Helper function to get the address corresponding to the addressing mode
-  Later functions will actually read/write to this line
-  These are for group 1 (cc == 01 opcodes) instructions
-*/
 byte* decode_addrmode_group1(byte addrmode){
   uint16_t address;
   switch (addrmode){
@@ -184,45 +171,36 @@ byte* decode_addrmode_group1(byte addrmode){
   return address+memory;
 }
 
-/*
-  Helper function to get the address corresponding to the addressing mode
-  Later functions will actually read/write to this line
-  These are for Group 2/3 (cc == 10,00 opcodes) instructions 
-  that aren't single-byte instructions
-*/
 byte* decode_addrmode_group23(byte addrmode, byte highbits){
   uint16_t address;
   switch(addrmode){
-    case 0:       // #immediate
+    case 0: 
       address = pc++;
       break; 
     
-    case 1:       // zero page
+    case 1: 
       address = read_pc();
       break;
 
-    case 2:       // accumulator
+    case 2: 
       return (&a);
 
-    case 3:       // absolute
+    case 3:
       address = read_address(pc);
       pc += 2;
       break;
 
-    case 4:       // zero page indirect
+    case 4:
       address = read_address(read_pc());
       break;
     
-    case 5:       // zero page, X
+    case 5:
       address = read_pc();
-      // need a special check here for LDX/STX
       address += (highbits&6) == 4 ? y : x;
       address &= 0xFF;
       break;
-
-    // No case 6 exists
-
-    case 7:       // absolute, X
+      
+    case 7: 
       address = read_address(pc);
       address += (highbits&6) == 4 ? y : x;
       break;
@@ -231,9 +209,6 @@ byte* decode_addrmode_group23(byte addrmode, byte highbits){
   return (memory+address);
 }
 
-/*
-  Runs an instruction from Group 1
-*/
 void run_instruction_group1(byte *address, uint8_t highbits){
   printf("run_instruction_group1: highbits=%d\n", highbits);
   switch(highbits){
@@ -267,9 +242,6 @@ void run_instruction_group1(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs an instruction from Group 2
-*/
 void run_instruction_group2(byte *address, uint8_t highbits){
   switch(highbits){
     case 0:
@@ -300,13 +272,8 @@ void run_instruction_group2(byte *address, uint8_t highbits){
   return;
 }
 
-/*
-  Runs an instruction from Group 3
-*/
 void run_instruction_group3(byte *address, uint8_t highbits){
   switch(highbits){
-    // case 0:
-    //    No case 0
     case 1:
       BIT(address);
       break;
@@ -333,8 +300,6 @@ void run_instruction_group3(byte *address, uint8_t highbits){
 
 
 void run_instruction_branching(uint8_t highbits){
-  // All branching instructions use relative addressing
-  // This is a SIGNED 8 bit integer
   int8_t offset = read_pc();
   uint16_t addr = pc + offset;
   uint8_t shift = 0;
@@ -364,7 +329,6 @@ void run_instruction_branching(uint8_t highbits){
       break;
   }
 
-  // Branch if flag is equal to value
   if( ((flags & (1 << shift)) > 0) == value ){
     set_pc(addr);
   }
@@ -375,25 +339,19 @@ void run_instruction_branching(uint8_t highbits){
 
 void run_instruction_sbyte1(uint8_t highbits){
   switch(highbits){
-    // Push/Pull operations
     case 0:
-      // PHP
       push_to_stack(&flags);
       break;
     case 2:
-      // PLP
       pull_from_stack(&flags);
       break;
     case 4:
-      // PHA
       push_to_stack(&a);
       break;
     case 6:
-      // PLA
       pull_from_stack(&a);
       break;
 
-    // Status Bit set/clear
     case 1:
       // CLC 0001
     case 3:
@@ -406,18 +364,14 @@ void run_instruction_sbyte1(uint8_t highbits){
       break;
 
     case 11:
-      // CLV
       set_clear_flag(6, 0);
       break;
 
     case 13:
-      // CLD
     case 15:
-      // SED
       set_clear_flag(3, (highbits&2) >> 1);
       break;
-
-    // Transfer Operations
+      
     case 9:
       // TYA
       transfer_registers(&y, &a);
@@ -427,8 +381,7 @@ void run_instruction_sbyte1(uint8_t highbits){
       // TAY
       transfer_registers(&a, &y);
       break;
-
-    // Increment / Decrement
+      
     case 8:
       // DEY
       DEC(&y);
@@ -469,7 +422,6 @@ void run_instruction_sbyte2(uint8_t highbits){
       pull_from_stack(&y);
       break;
 
-    // Transfer Operations
     case 8:
       // TXA
       transfer_registers(&x, &a);
@@ -505,18 +457,13 @@ void run_instruction_sbyte2(uint8_t highbits){
   return;
 }
 
-/*
-  Runs one of the interrupt instructions
-*/
+
 void run_instruction_interrupt(uint8_t highbits){
-  // These will all be of the form 0aa0 0000
-  // we're passing in upper three bits (aaa0 0000)
   switch(highbits){
     case 0:  
       BRK();
       break;
     case 1:     
-      // This is the JSR Absolute instruction
       JSR();
       break;
     case 2:
@@ -529,18 +476,13 @@ void run_instruction_interrupt(uint8_t highbits){
   return;
 }
 
-
-/*
-  Tries to execute one of the expanded 65C02 opcodes
-*/
 bool try65C02opcode(uint8_t opcode){
   byte *addr;
   uint8_t code = opcode;
   switch(opcode){
-    // STZ instructions (0x9E is handled elsewhere)
     case 0x9C:
       // abs
-      code = 0x8C; // Convert bbb to 3 for abs indexing
+      code = 0x8C;
     case 0x64:
       // zp
     case 0x74:
