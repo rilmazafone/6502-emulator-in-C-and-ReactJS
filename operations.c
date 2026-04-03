@@ -57,7 +57,7 @@ void CMP(byte *addr){
     flags = (flags & 0x7C) | 
             ((res & 0x80)) |         // N
             ((res==0) << 1) |        // Z
-            ((a >= *addr) << 0);     // C (set if a >= operand)
+            ((a >= *addr) << 0);     // C
 }
 
 void SBC(byte *addr){
@@ -298,12 +298,11 @@ void RTI(){
 }
 
 void RTS(){
-    // Pull PC
     byte lo, hi;
     pull_from_stack(&lo);
     pull_from_stack(&hi);
     uint16_t addr = (hi << 8) | lo;
-    pc = addr + 1; // RTS returns to address+1
+    pc = addr + 1;
 }
 
 
