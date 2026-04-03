@@ -6,7 +6,7 @@ byte x = 0;
 byte y = 0;
 uint16_t pc = 0;
 byte stackpointer = 0xFF;
-byte flags = 0x20; // Interrupt flag set on reset
+byte flags = 0x20;
 byte memory[0x10000] = {0};
 
 void reset_cpu(){
@@ -15,7 +15,7 @@ void reset_cpu(){
     x = 0;
     y = 0;
     stackpointer = 0xFF;
-    flags = 0x20; // Interrupt flag set
+    flags = 0x20;
 
   
     pc = (memory[0xFFFD] << 8) | memory[0xFFFC];
