@@ -1,4 +1,4 @@
-#include "func_web.h"
+#include "func.h"
 
 void reset_cpu(){
   a = 0;
@@ -25,7 +25,6 @@ uint16_t read_address(uint16_t offset){
 
 void write_byte(byte *address, byte value){
   *address = value;
-  return;
 }
 
 byte read_pc(){
@@ -36,10 +35,9 @@ byte read_pc(){
 
 void set_pc(uint16_t value){
   pc = value;
-  return;
 }
-uint8_t execute_instruction(){
 
+uint8_t execute_instruction(){
   uint8_t opcode = read_pc();
   if(opcode == 0) return 0;
 
@@ -83,7 +81,7 @@ uint8_t execute_instruction(){
           run_instruction_interrupt(aaa);
 
         } else {
-          address = decode_addrmode_group23(bbb, 0); 
+          address = decode_addrmode_group23(bbb, 0);
           run_instruction_group3(address, aaa);
         }
         break;
@@ -100,7 +98,6 @@ uint8_t execute_instruction(){
   return opcode;
 }
 
-
 byte* decode_addrmode_group1(byte addrmode){
   uint16_t address;
   switch (addrmode){
@@ -109,36 +106,36 @@ byte* decode_addrmode_group1(byte addrmode){
       address &= 0xFF;
       address = read_address(address);
       break;
-    
+
     case 1:
       address = read_pc();
       break;
-    
+
     case 2:
       address = pc++;
       break;
-    
+
     case 3:
       address = read_address(pc);
       pc += 2;
       break;
-    
+
     case 4:
       address = read_address(read_pc());
       address += y;
       break;
-    
+
     case 5:
       address = read_pc() + x;
       address &= 0xFF;
       break;
-    
+
     case 6:
       address = read_address(pc);
       address += y;
       pc += 2;
       break;
-    
+
     case 7:
       address = read_address(pc);
       address += x;
@@ -154,8 +151,8 @@ byte* decode_addrmode_group23(byte addrmode, byte highbits){
   switch(addrmode){
     case 0:
       address = pc++;
-      break; 
-    
+      break;
+
     case 1:
       address = read_pc();
       break;
@@ -171,7 +168,7 @@ byte* decode_addrmode_group23(byte addrmode, byte highbits){
     case 4:
       address = read_address(read_pc());
       break;
-    
+
     case 5:
       address = read_pc();
       address += (highbits&6) == 4 ? y : x;
@@ -214,10 +211,7 @@ void run_instruction_group1(byte *address, uint8_t highbits){
       SBC(address);
       break;
   }
-
-  return;
 }
-
 
 void run_instruction_group2(byte *address, uint8_t highbits){
   switch(highbits){
@@ -246,9 +240,7 @@ void run_instruction_group2(byte *address, uint8_t highbits){
       INC(address);
       break;
   }
-  return;
 }
-
 
 void run_instruction_group3(byte *address, uint8_t highbits){
   switch(highbits){
@@ -272,10 +264,7 @@ void run_instruction_group3(byte *address, uint8_t highbits){
       CPX(address);
       break;
   }
-
-  return;
 }
-
 
 void run_instruction_branching(uint8_t highbits){
   int8_t offset = read_pc();
@@ -284,7 +273,7 @@ void run_instruction_branching(uint8_t highbits){
   if (highbits == 8){
     set_pc(addr);
     return;
-  } 
+  }
 
   byte flag = (highbits & 0xC) >> 2;
   byte value = (highbits>>1) & 1;
@@ -293,15 +282,12 @@ void run_instruction_branching(uint8_t highbits){
     case 0:
       shift = 7;
       break;
-
     case 1:
       shift = 6;
       break;
-
     case 2:
       shift = 0;
       break;
-
     case 3:
       shift = 1;
       break;
@@ -310,11 +296,7 @@ void run_instruction_branching(uint8_t highbits){
   if( ((flags & (1 << shift)) > 0) == value ){
     set_pc(addr);
   }
-
-  return;
 }
-
-
 
 void run_instruction_sbyte1(uint8_t highbits){
   switch(highbits){
@@ -332,55 +314,41 @@ void run_instruction_sbyte1(uint8_t highbits){
       break;
 
     case 1:
-      // CLC 0001
     case 3:
-      // SEC 0011
     case 5:
-      // CLI 0101
     case 7:
-      // SEI 0111
       set_clear_flag((highbits&0xC)>>1, (highbits&2)>>1);
       break;
 
     case 11:
-      // CLV
       set_clear_flag(6, 0);
       break;
 
     case 13:
-      // CLD
     case 15:
-      // SED
       set_clear_flag(3, (highbits&2) >> 1);
       break;
 
     case 9:
-      // TYA
       transfer_registers(&y, &a);
       break;
 
     case 10:
-      // TAY
       transfer_registers(&a, &y);
       break;
 
     case 8:
-      // DEY
       DEC(&y);
       break;
 
     case 12:
-      // INY
       INC(&y);
       break;
 
     case 14:
-      // INX
       INC(&x);
       break;
-
   }
-  return;
 }
 
 void run_instruction_sbyte2(uint8_t highbits){
@@ -399,46 +367,38 @@ void run_instruction_sbyte2(uint8_t highbits){
       break;
 
     case 8:
-      // TXA
       transfer_registers(&x, &a);
       break;
     case 9:
-      // TXS
       transfer_registers(&x, &stackpointer);
       break;
     case 10:
-      // TAX
       transfer_registers(&a, &x);
       break;
     case 11:
       transfer_registers(&stackpointer, &x);
-      // TSX
       break;
 
     case 12:
-      // DEX
       DEC(&x);
       break;
 
     case 13:
-      // PHX
       push_to_stack(&x);
       break;
 
     case 15:
-      // PLX
       pull_from_stack(&x);
       break;
   }
-  return;
 }
 
 void run_instruction_interrupt(uint8_t highbits){
   switch(highbits){
-    case 0:  
+    case 0:
       BRK();
       break;
-    case 1:     
+    case 1:
       JSR();
       break;
     case 2:
@@ -448,7 +408,6 @@ void run_instruction_interrupt(uint8_t highbits){
       RTS();
       break;
   }
-  return;
 }
 
 bool try65C02opcode(uint8_t opcode){
@@ -464,15 +423,9 @@ bool try65C02opcode(uint8_t opcode){
       return true;
 
     case 0x14:
-      // zp
     case 0x1C:
-      // abs
-
-    // TSB
     case 0x04:
-      // zp
     case 0x0C:
-      // abs
       addr = decode_addrmode_group1((code & 0x0C) >> 2);
       (code & 0xF0) > 0 ? TRB(addr) : TSB(addr);
       return true;
@@ -481,6 +434,3 @@ bool try65C02opcode(uint8_t opcode){
       return false;
   }
 }
-
-
-

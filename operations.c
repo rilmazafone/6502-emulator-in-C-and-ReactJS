@@ -6,37 +6,37 @@ byte* get_memory_ptr() {
 
 void ORA(byte *addr){
     a = a | (*addr);
-    flags = (flags & 0x7D) | 
-            ((a & 0x80)) |           // N
-            ((a==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((a & 0x80)) |
+            ((a==0) << 1);
 }
 
 void AND(byte *addr){
     a = a & (*addr);
-    flags = (flags & 0x7D) | 
-            ((a & 0x80)) |           // N
-            ((a==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((a & 0x80)) |
+            ((a==0) << 1);
 }
 
 void EOR(byte *addr){
     a = a ^ (*addr);
-    flags = (flags & 0x7D) | 
-            ((a & 0x80)) |           // N
-            ((a==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((a & 0x80)) |
+            ((a==0) << 1);
 }
 
 void ADC(byte *addr){
     uint16_t sum = a + (*addr) + (flags & 1);
     uint8_t res = sum & 0xFF;
-    
+
     uint8_t overflow = (~(a ^ *addr) & (a ^ res) & 0x80) != 0;
-    
+
     a = res;
-    flags = (flags & 0x3C) | 
-            (a & 0x80) |           // N
-            (overflow << 6) |      // V
-            ((a==0) << 1) |        // Z
-            ((sum > 0xFF) << 0);   // C
+    flags = (flags & 0x3C) |
+            (a & 0x80) |
+            (overflow << 6) |
+            ((a==0) << 1) |
+            ((sum > 0xFF) << 0);
 }
 
 void STA(byte *addr){
@@ -45,34 +45,34 @@ void STA(byte *addr){
 
 void LDA(byte *addr){
     a = *addr;
-    flags = (flags & 0x7D) | 
-            ((a & 0x80)) |           // N
-            ((a==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((a & 0x80)) |
+            ((a==0) << 1);
 }
 
 void CMP(byte *addr){
     uint16_t diff = a - (*addr);
     uint8_t res = diff & 0xFF;
-    
-    flags = (flags & 0x7C) | 
-            ((res & 0x80)) |         // N
-            ((res==0) << 1) |        // Z
-            ((a >= *addr) << 0);     // C
+
+    flags = (flags & 0x7C) |
+            ((res & 0x80)) |
+            ((res==0) << 1) |
+            ((a >= *addr) << 0);
 }
 
 void SBC(byte *addr){
     uint8_t operand = ~(*addr);
     uint16_t sum = a + operand + (flags & 1);
     uint8_t res = sum & 0xFF;
-    
+
     uint8_t overflow = ((a ^ res) & (~(*addr) ^ res) & 0x80) != 0;
-    
+
     a = res;
-    flags = (flags & 0x3C) | 
-            (a & 0x80) |           // N
-            (overflow << 6) |      // V
-            ((a==0) << 1) |        // Z
-            ((sum > 0xFF) << 0);   // C
+    flags = (flags & 0x3C) |
+            (a & 0x80) |
+            (overflow << 6) |
+            ((a==0) << 1) |
+            ((sum > 0xFF) << 0);
 }
 
 void ASL(byte *addr){
@@ -80,11 +80,11 @@ void ASL(byte *addr){
     uint8_t carry = (val & 0x80) >> 7;
     val = val << 1;
     *addr = val;
-    
-    flags = (flags & 0x7C) | 
-            ((val & 0x80)) |     // N
-            ((val==0) << 1) |    // Z
-            carry;               // C
+
+    flags = (flags & 0x7C) |
+            ((val & 0x80)) |
+            ((val==0) << 1) |
+            carry;
 }
 
 void ROL(byte *addr){
@@ -93,11 +93,11 @@ void ROL(byte *addr){
     uint8_t new_carry = (val & 0x80) >> 7;
     val = (val << 1) | old_carry;
     *addr = val;
-    
-    flags = (flags & 0x7C) | 
-            ((val & 0x80)) |     // N
-            ((val==0) << 1) |    // Z
-            new_carry;           // C
+
+    flags = (flags & 0x7C) |
+            ((val & 0x80)) |
+            ((val==0) << 1) |
+            new_carry;
 }
 
 void LSR(byte *addr){
@@ -105,11 +105,11 @@ void LSR(byte *addr){
     uint8_t carry = val & 1;
     val = val >> 1;
     *addr = val;
-    
-    flags = (flags & 0x7C) | 
-            ((val & 0x80)) |     // N
-            ((val==0) << 1) |    // Z
-            carry;               // C
+
+    flags = (flags & 0x7C) |
+            ((val & 0x80)) |
+            ((val==0) << 1) |
+            carry;
 }
 
 void ROR(byte *addr){
@@ -118,11 +118,11 @@ void ROR(byte *addr){
     uint8_t new_carry = val & 1;
     val = (val >> 1) | (old_carry << 7);
     *addr = val;
-    
-    flags = (flags & 0x7C) | 
-            ((val & 0x80)) |     // N
-            ((val==0) << 1) |    // Z
-            new_carry;           // C
+
+    flags = (flags & 0x7C) |
+            ((val & 0x80)) |
+            ((val==0) << 1) |
+            new_carry;
 }
 
 void STX(byte *addr){
@@ -131,34 +131,34 @@ void STX(byte *addr){
 
 void LDX(byte *addr){
     x = *addr;
-    flags = (flags & 0x7D) | 
-            ((x & 0x80)) |           // N
-            ((x==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((x & 0x80)) |
+            ((x==0) << 1);
 }
 
 void DEC(byte *addr){
     uint8_t val = (*addr) - 1;
     *addr = val;
-    flags = (flags & 0x7D) | 
-            ((val & 0x80)) |           // N
-            ((val==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((val & 0x80)) |
+            ((val==0) << 1);
 }
 
 void INC(byte *addr){
     uint8_t val = (*addr) + 1;
     *addr = val;
-    flags = (flags & 0x7D) | 
-            ((val & 0x80)) |           // N
-            ((val==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((val & 0x80)) |
+            ((val==0) << 1);
 }
 
 void BIT(byte *addr){
     uint8_t val = *addr;
     uint8_t result = a & val;
-    
+
     flags = (flags & 0x3D) |
-            ((result == 0) << 1) |    // Z
-            (val & 0xC0);              // N,V
+            ((result == 0) << 1) |
+            (val & 0xC0);
 }
 
 void JMP(byte *addr){
@@ -172,29 +172,29 @@ void STY(byte *addr){
 
 void LDY(byte *addr){
     y = *addr;
-    flags = (flags & 0x7D) | 
-            ((y & 0x80)) |           // N
-            ((y==0) << 1);           // Z
+    flags = (flags & 0x7D) |
+            ((y & 0x80)) |
+            ((y==0) << 1);
 }
 
 void CPY(byte *addr){
     uint16_t diff = y - (*addr);
     uint8_t res = diff & 0xFF;
-    
-    flags = (flags & 0x7C) | 
-            ((res & 0x80)) |         // N
-            ((res==0) << 1) |        // Z
-            ((y >= *addr) << 0);     // C
+
+    flags = (flags & 0x7C) |
+            ((res & 0x80)) |
+            ((res==0) << 1) |
+            ((y >= *addr) << 0);
 }
 
 void CPX(byte *addr){
     uint16_t diff = x - (*addr);
     uint8_t res = diff & 0xFF;
-    
-    flags = (flags & 0x7C) | 
-            ((res & 0x80)) |         // N
-            ((res==0) << 1) |        // Z
-            ((x >= *addr) << 0);     // C
+
+    flags = (flags & 0x7C) |
+            ((res & 0x80)) |
+            ((res==0) << 1) |
+            ((x >= *addr) << 0);
 }
 
 void push_to_stack(byte *registerptr){
@@ -207,11 +207,11 @@ void pull_from_stack(byte *registerptr){
     stackpointer++;
     uint16_t offset = 0x100 | stackpointer;
     *registerptr = memory[offset];
-    
+
     if(registerptr != &flags && registerptr != &stackpointer){
-        flags = (flags & 0x7D) | 
-                ((*registerptr & 0x80)) |           // N
-                ((*registerptr == 0) << 1);         // Z
+        flags = (flags & 0x7D) |
+                ((*registerptr & 0x80)) |
+                ((*registerptr == 0) << 1);
     }
 }
 
@@ -219,9 +219,9 @@ void transfer_registers(byte *reg1, byte *reg2){
     byte val = *reg1;
     *reg2 = val;
     if(reg2 != &stackpointer){
-        flags = (flags & 0x7D) | 
-                ((val & 0x80)) |           // N
-                ((val==0) << 1);           // Z
+        flags = (flags & 0x7D) |
+                ((val & 0x80)) |
+                ((val==0) << 1);
     }
 }
 
@@ -253,7 +253,6 @@ uint16_t pull_pc(void){
 }
 
 void NOP(){
-
 }
 
 void BRK(){
@@ -263,34 +262,34 @@ void BRK(){
     uint16_t return_addr = pc + 1;
     byte hi = (return_addr >> 8) & 0xFF;
     byte lo = return_addr & 0xFF;
-    
+
     push_to_stack(&hi);
     push_to_stack(&lo);
-    
+
     byte status = flags | 0x30;
     push_to_stack(&status);
-    
+
     pc = (memory[0xFFFF] << 8) | memory[0xFFFE];
 }
 
 void JSR(){
     uint16_t target = (memory[pc+1] << 8) | memory[pc];
-    
+
     uint16_t return_addr = pc + 2;
     byte hi = (return_addr >> 8) & 0xFF;
     byte lo = return_addr & 0xFF;
-    
+
     push_to_stack(&hi);
     push_to_stack(&lo);
-    
+
     pc = target;
 }
 
 void RTI(){
-  byte status;
+    byte status;
     pull_from_stack(&status);
     flags = (status & ~0x30) | 0x20;
-    
+
     byte lo, hi;
     pull_from_stack(&lo);
     pull_from_stack(&hi);
@@ -305,41 +304,35 @@ void RTS(){
     pc = addr + 1;
 }
 
-
 void bit_set_clear(byte high){
-  uint8_t addr = read_pc();
-  uint8_t val_to_write = read_byte(memory+addr);
-  val_to_write = val_to_write & (0<<(high&0x7)) | (high>>3<<(high&0x7));
-  write_byte(memory+addr, val_to_write);
-  return;
+    uint8_t addr = read_pc();
+    uint8_t val_to_write = read_byte(memory+addr);
+    val_to_write = val_to_write & (0<<(high&0x7)) | (high>>3<<(high&0x7));
+    write_byte(memory+addr, val_to_write);
 }
 
 void test_and_branch(byte high){
-  uint8_t addr_to_test = read_pc();
-  int8_t offset = read_pc();
-  if ((read_byte(memory+addr_to_test) & (1<<(high&0x7))) == (high>>3<<(high&0x7))){
-    JMP(memory+pc+offset);
-  }
-  return;
+    uint8_t addr_to_test = read_pc();
+    int8_t offset = read_pc();
+    if ((read_byte(memory+addr_to_test) & (1<<(high&0x7))) == (high>>3<<(high&0x7))){
+        JMP(memory+pc+offset);
+    }
 }
 
 void STZ(byte *addr){
-  write_byte(addr, 0);
-  return;
+    write_byte(addr, 0);
 }
 
 void TSB(byte *addr){
-  uint8_t mem = read_byte(addr);
-  uint8_t val = mem | a;
-  flags = (flags & 0xFD) | (((mem & a) == 0) << 1);
-  write_byte(addr, val);
-  return;
+    uint8_t mem = read_byte(addr);
+    uint8_t val = mem | a;
+    flags = (flags & 0xFD) | (((mem & a) == 0) << 1);
+    write_byte(addr, val);
 }
 
 void TRB(byte *addr){
-  uint8_t mem = read_byte(addr);
-  uint8_t val = mem & (~a);
-  flags = (flags & 0xFD) | (((mem & a) == 0) << 1);
-  write_byte(addr, val);
-  return;
+    uint8_t mem = read_byte(addr);
+    uint8_t val = mem & (~a);
+    flags = (flags & 0xFD) | (((mem & a) == 0) << 1);
+    write_byte(addr, val);
 }

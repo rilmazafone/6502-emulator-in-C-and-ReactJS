@@ -1,0 +1,6 @@
+*.o
+emulator
+emulator.js
+emulator.wasm
+6502-web/build/
+6502-web/node_modules/

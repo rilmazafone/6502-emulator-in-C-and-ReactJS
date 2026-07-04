@@ -17,7 +17,6 @@ uint16_t pull_word(void);
 void push_pc(void);
 uint16_t pull_pc(void);
 
-//G1
 void SBC(byte *addr);
 void ORA(byte *addr);
 void AND(byte *addr);
@@ -27,7 +26,6 @@ void STA(byte *addr);
 void LDA(byte *addr);
 void CMP(byte *addr);
 
-//G2
 void ASL(byte *addr);
 void ROL(byte *addr);
 void LSR(byte *addr);
@@ -37,7 +35,6 @@ void LDX(byte *addr);
 void DEC(byte *addr);
 void INC(byte *addr);
 
-//G3
 void BIT(byte *addr);
 void JMP(byte *addr);
 void STY(byte *addr);

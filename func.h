@@ -2,6 +2,7 @@
 #define COREHEADERINCLUDE
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
 #include "registers.h"
@@ -40,8 +41,5 @@ void run_instruction_sbyte2(uint8_t highbits);
 void run_instruction_interrupt(uint8_t highbits);
 
 bool try65C02opcode(uint8_t opcode);
-
-
-
 
 #endif
