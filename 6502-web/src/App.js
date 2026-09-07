@@ -32,13 +32,8 @@ function DisplayScreen({ pixels, width = 32, height = 32 }) {
       ref={canvasRef}
       width={width * 8}
       height={height * 8}
-      style={{
-        border: '2px solid #667eea',
-        borderRadius: '4px',
-        imageRendering: 'pixelated',
-        width: '256px',
-        height: '256px'
-      }}
+      className="screen-canvas"
+      style={{ imageRendering: 'pixelated' }}
     />
   );
 }
@@ -69,6 +64,23 @@ loop: INX
   const isRunningRef = useRef(false);
   const speedRef = useRef(executionSpeed);
   speedRef.current = executionSpeed;
+  const codeRef = useRef(null);
+
+  // Pressing Tab inserts two spaces instead of moving focus away.
+  const onEditorKeyDown = (e) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const el = codeRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? start;
+    const next = code.slice(0, start) + '  ' + code.slice(end);
+    setCode(next);
+    requestAnimationFrame(() => {
+      el.selectionStart = start + 2;
+      el.selectionEnd = start + 2;
+    });
+  };
 
   const updateRegisters = useCallback(() => {
     if (!moduleRef.current) return;
@@ -149,6 +161,11 @@ loop: INX
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!moduleRef.current) return;
+      // Never steal keys while the user is typing in the editor.
+      const el = e.target;
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) {
+        return;
+      }
       const keyMap = {
         'ArrowUp': 0x80,
         'ArrowDown': 0x81,
@@ -344,9 +361,17 @@ loop: TXA
 
   return (
     <div className="app">
-      <header>
-        <h1>6502 WebAssembly Emulator</h1>
-        <p>Run 6502 assembly with graphics</p>
+      <header className="masthead">
+        <div className="brand">
+          <span className="brand-name">6502<span className="brand-dot">.wasm</span></span>
+          <span className={`brand-status ${isRunning ? 'running' : ''}`}>
+            <span className={`led ${isRunning ? 'on blink' : ''}`}></span>
+            {isLoading ? 'BOOTING' : isRunning ? 'RUNNING' : 'READY'}
+          </span>
+        </div>
+        <p className="tagline">
+          type 6502 assembly &middot; load &middot; run &middot; video RAM $0200&ndash;$05FF drives the 32&times;32 screen
+        </p>
       </header>
 
       <div className="container">
@@ -376,45 +401,42 @@ loop: TXA
                 </div>
               </div>
 
-              <div style={{ padding: '1rem', background: '#2a2a2a' }}>
-                <label style={{ fontSize: '0.9rem', color: '#808080' }}>
-                  Speed: {executionSpeed}ms
+              <div className="speed-block">
+                <label>
+                  <span className="speed-label">SPEED&nbsp;</span>
+                  <span className="speed-value">{executionSpeed}ms</span>
                   <input
                     type="range"
                     min="1"
                     max="500"
                     value={executionSpeed}
                     onChange={(e) => setExecutionSpeed(Number(e.target.value))}
-                    style={{ width: '100%', marginTop: '0.5rem' }}
                   />
                 </label>
               </div>
 
-              <div style={{ padding: '0 1rem 1rem', background: '#2a2a2a', display: 'flex', gap: '0.5rem' }}>
-                <button onClick={() => loadExample('counter')} className="btn" style={{ flex: 1 }}>
-                  Counter
-                </button>
-                <button onClick={() => loadExample('rainbow')} className="btn" style={{ flex: 1 }}>
-                  Rainbow
-                </button>
-                <button onClick={() => loadExample('draw')} className="btn" style={{ flex: 1 }}>
-                  Smiley
-                </button>
+              <div className="example-bar">
+                <span className="example-hint">examples:</span>
+                <button onClick={() => loadExample('counter')} className="btn">Counter</button>
+                <button onClick={() => loadExample('rainbow')} className="btn">Rainbow</button>
+                <button onClick={() => loadExample('draw')} className="btn">Smiley</button>
               </div>
 
               <textarea
+                ref={codeRef}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                onKeyDown={onEditorKeyDown}
                 className="code-editor"
                 spellCheck={false}
-                rows={12}
+                aria-label="Assembly code editor"
               />
 
               <div className="panel-header">
                 <h3>Output</h3>
-                <small style={{ opacity: 0.7 }}>{instructionCount} bytes</small>
+                <small className="dim-label">{instructionCount} bytes</small>
               </div>
-              <pre className="output">{output}</pre>
+              <pre className="output" aria-live="polite">{output}</pre>
 
               {error && (
                 <div className="error">{error}</div>
@@ -423,12 +445,14 @@ loop: TXA
 
             <div className="panel registers-panel">
               <div className="panel-header">
-                <h3>Display (32x32 pixels)</h3>
-                <small style={{ opacity: 0.7 }}>Video RAM: $0200-$05FF</small>
+                <h3>Display <span className="dim-label">32x32 px</span></h3>
+                <small className="dim-label">video RAM $0200-$05FF</small>
               </div>
 
-              <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', background: '#1a1a1a' }}>
-                <DisplayScreen pixels={displayPixels} />
+              <div className="screen-bezel">
+                <div className="screen-crt">
+                  <DisplayScreen pixels={displayPixels} />
+                </div>
               </div>
 
               <div className="panel-header">

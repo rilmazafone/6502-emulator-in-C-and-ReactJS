@@ -1,9 +1,6 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+/* Base styling lives in App.css. Kept as the root stylesheet entry point. */
+html,
+body,
+#root {
+  min-height: 100%;
 }
