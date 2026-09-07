@@ -1,9 +1,5 @@
 #include "operations.h"
 
-byte* get_memory_ptr() {
-    return memory;
-}
-
 void ORA(byte *addr){
     a = a | (*addr);
     flags = (flags & 0x7D) |
@@ -230,28 +226,6 @@ void set_clear_flag(uint8_t shiftamt, uint8_t val){
     flags = (flags & ~(1 << shiftamt)) | newval;
 }
 
-void push_word(uint16_t value){
-    byte hi = (value >> 8) & 0xFF;
-    byte lo = value & 0xFF;
-    push_to_stack(&hi);
-    push_to_stack(&lo);
-}
-
-uint16_t pull_word(void){
-    byte lo, hi;
-    pull_from_stack(&lo);
-    pull_from_stack(&hi);
-    return (hi << 8) | lo;
-}
-
-void push_pc(void){
-    push_word(pc);
-}
-
-uint16_t pull_pc(void){
-    return pull_word();
-}
-
 void NOP(){
 }
 
@@ -275,7 +249,7 @@ void BRK(){
 void JSR(){
     uint16_t target = (memory[pc+1] << 8) | memory[pc];
 
-    uint16_t return_addr = pc + 2;
+    uint16_t return_addr = pc + 1;
     byte hi = (return_addr >> 8) & 0xFF;
     byte lo = return_addr & 0xFF;
 
@@ -306,16 +280,24 @@ void RTS(){
 
 void bit_set_clear(byte high){
     uint8_t addr = read_pc();
-    uint8_t val_to_write = read_byte(memory+addr);
-    val_to_write = val_to_write & (0<<(high&0x7)) | (high>>3<<(high&0x7));
-    write_byte(memory+addr, val_to_write);
+    uint8_t bit = 1 << (high & 0x7);
+    uint8_t val = read_byte(memory + addr);
+
+    if (high & 0x8)
+        val |= bit;   /* SMB: set memory bit */
+    else
+        val &= ~bit;  /* RMB: reset memory bit */
+
+    write_byte(memory + addr, val);
 }
 
 void test_and_branch(byte high){
     uint8_t addr_to_test = read_pc();
     int8_t offset = read_pc();
-    if ((read_byte(memory+addr_to_test) & (1<<(high&0x7))) == (high>>3<<(high&0x7))){
-        JMP(memory+pc+offset);
+    uint8_t bit = 1 << (high & 0x7);
+
+    if (((read_byte(memory + addr_to_test) & bit) != 0) == ((high & 0x8) != 0)){
+        JMP(memory + (pc + offset));
     }
 }
 

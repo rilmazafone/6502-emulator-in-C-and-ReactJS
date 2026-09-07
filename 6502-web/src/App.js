@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
+import { assemble } from './assembler.js';
 
 const COLORS = [
   '#000000', '#FFFFFF', '#FF0000', '#00FF00',
@@ -14,19 +15,14 @@ function DisplayScreen({ pixels, width = 32, height = 32 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     const pixelSize = 8;
-
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     for (let i = 0; i < pixels.length; i++) {
       const x = i % width;
       const y = Math.floor(i / width);
-      const colorIndex = pixels[i] & 0x0F;
-
-      ctx.fillStyle = COLORS[colorIndex];
+      ctx.fillStyle = COLORS[pixels[i] & 0x0F];
       ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
     }
   }, [pixels, width, height]);
@@ -48,24 +44,31 @@ function DisplayScreen({ pixels, width = 32, height = 32 }) {
 }
 
 function App() {
-  const [code, setCode] = useState(`; Draw a pixel at center
-LDA #$01
-STA $0310
-BRK`);
+  const [code, setCode] = useState(`; Count from 1 to 10, store the result at $0200
+      LDX #$00
+loop: INX
+      TXA
+      STA $0200
+      CMP #$0A
+      BNE loop
+      BRK`);
 
   const [output, setOutput] = useState('');
   const [registers, setRegisters] = useState({
-    a: 0, x: 0, y: 0, pc: 0, sp: 0xFF, flags: 0x20
+    a: 0, x: 0, y: 0, pc: 0, sp: 0xFF, flags: 0x24
   });
   const [displayPixels, setDisplayPixels] = useState(new Array(1024).fill(0));
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [executionSpeed, setExecutionSpeed] = useState(100);
+  const [executionSpeed, setExecutionSpeed] = useState(20);
+  const [instructionCount, setInstructionCount] = useState(0);
 
   const moduleRef = useRef(null);
   const animationRef = useRef(null);
   const isRunningRef = useRef(false);
+  const speedRef = useRef(executionSpeed);
+  speedRef.current = executionSpeed;
 
   const updateRegisters = useCallback(() => {
     if (!moduleRef.current) return;
@@ -117,9 +120,9 @@ BRK`);
         });
 
         moduleRef.current = {
-          init: Module.cwrap('js_init', null, []),
           reset: Module.cwrap('js_reset', null, []),
           step: Module.cwrap('js_step', 'number', []),
+          clearMem: Module.cwrap('js_clear_mem', null, []),
           writeMem: Module.cwrap('js_write_mem', null, ['number', 'number']),
           readMem: Module.cwrap('js_read_mem', 'number', ['number']),
           getA: Module.cwrap('js_get_a', 'number', []),
@@ -127,14 +130,12 @@ BRK`);
           getY: Module.cwrap('js_get_y', 'number', []),
           getPC: Module.cwrap('js_get_pc', 'number', []),
           getSP: Module.cwrap('js_get_sp', 'number', []),
-          getFlags: Module.cwrap('js_get_flags', 'number', []),
-          setPC: Module.cwrap('js_set_pc', null, ['number'])
+          getFlags: Module.cwrap('js_get_flags', 'number', [])
         };
 
-        moduleRef.current.init();
+        moduleRef.current.reset();
         setOutput('Emulator ready!\n');
         setIsLoading(false);
-
       } catch (err) {
         console.error('Initialization failed:', err);
         setError('Failed to load: ' + err.message);
@@ -148,7 +149,6 @@ BRK`);
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!moduleRef.current) return;
-
       const keyMap = {
         'ArrowUp': 0x80,
         'ArrowDown': 0x81,
@@ -160,13 +160,11 @@ BRK`);
         'a': 0x82,
         'd': 0x83
       };
-
       if (keyMap[e.key]) {
         e.preventDefault();
         moduleRef.current.writeMem(0xFF, keyMap[e.key]);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
@@ -174,109 +172,30 @@ BRK`);
   const assembleAndLoad = () => {
     try {
       setError('');
-      const program = [];
-      const lines = code.split('\n');
-
-      const opcodes = {
-        'LDA #$': 0xA9,
-        'STA $': 0x8D,
-        'ADC #$': 0x69,
-        'SBC #$': 0xE9,
-        'LDX #$': 0xA2,
-        'LDY #$': 0xA0,
-        'STX $': 0x8E,
-        'STY $': 0x8C,
-        'CMP #$': 0xC9,
-        'CPX #$': 0xE0,
-        'CPY #$': 0xC0,
-        'AND #$': 0x29,
-        'ORA #$': 0x09,
-        'EOR #$': 0x49,
-        'TAX': 0xAA,
-        'TAY': 0xA8,
-        'TXA': 0x8A,
-        'TYA': 0x98,
-        'INX': 0xE8,
-        'INY': 0xC8,
-        'DEX': 0xCA,
-        'DEY': 0x88,
-        'INA': 0x1A,
-        'DEA': 0x3A,
-        'PHA': 0x48,
-        'PLA': 0x68,
-        'PHP': 0x08,
-        'PLP': 0x28,
-        'BRK': 0x00,
-        'NOP': 0xEA,
-        'ASL': 0x0A,
-        'LSR': 0x4A,
-        'ROL': 0x2A,
-        'ROR': 0x6A,
-        'SEC': 0x38,
-        'CLC': 0x18,
-        'SEI': 0x78,
-        'CLI': 0x58,
-        'SED': 0xF8,
-        'CLD': 0xD8,
-        'CLV': 0xB8,
-        'RTS': 0x60,
-        'RTI': 0x40
-      };
-
-      for (const line of lines) {
-        const trimmed = line.split(';')[0].trim();
-        if (!trimmed) continue;
-
-        let found = false;
-        for (const [pattern, opcode] of Object.entries(opcodes)) {
-          if (trimmed.toUpperCase().startsWith(pattern.replace('$', ''))) {
-            program.push(opcode);
-
-            if (pattern.includes('#$')) {
-              const match = trimmed.match(/#\$([0-9A-Fa-f]+)/);
-              if (match) {
-                program.push(parseInt(match[1], 16));
-              }
-            } else if (pattern.includes('$') && !pattern.includes('#')) {
-              const match = trimmed.match(/\$([0-9A-Fa-f]+)/);
-              if (match) {
-                const addr = parseInt(match[1], 16);
-                program.push(addr & 0xFF);
-                program.push((addr >> 8) & 0xFF);
-              }
-            }
-
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          setError(`Unknown instruction: ${trimmed}`);
-          return;
-        }
+      const result = assemble(code);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
-
+      const program = result.bytes;
       if (program.length === 0) {
         setError('No instructions to load');
         return;
       }
 
       const startAddr = 0x1000;
+      moduleRef.current.clearMem();
       program.forEach((byte, i) => {
         moduleRef.current.writeMem(startAddr + i, byte);
       });
-
       moduleRef.current.writeMem(0xFFFC, startAddr & 0xFF);
       moduleRef.current.writeMem(0xFFFD, (startAddr >> 8) & 0xFF);
-
       moduleRef.current.reset();
 
+      setInstructionCount(program.length);
       setOutput(`Loaded ${program.length} bytes at $${startAddr.toString(16).toUpperCase()}\n`);
-
       updateRegisters();
       updateDisplay();
-
     } catch (err) {
       setError('Assembly error: ' + err.message);
     }
@@ -284,14 +203,12 @@ BRK`);
 
   const step = () => {
     if (!moduleRef.current) return;
-
     try {
       const opcode = moduleRef.current.step();
+      const pc = moduleRef.current.getPC();
       updateRegisters();
       updateDisplay();
-
-      setOutput(prev => prev + `Executed: $${opcode.toString(16).padStart(2, '0')}\n`);
-
+      setOutput(prev => prev + `Step -> PC $${pc.toString(16).padStart(4, '0')}  opcode $${opcode.toString(16).padStart(2, '0')}\n`);
       if (opcode === 0x00) {
         setOutput(prev => prev + 'Program halted (BRK)\n');
       }
@@ -304,18 +221,17 @@ BRK`);
     if (isRunningRef.current) {
       isRunningRef.current = false;
       setIsRunning(false);
-      if (animationRef.current) {
-        clearTimeout(animationRef.current);
-      }
+      if (animationRef.current) clearTimeout(animationRef.current);
       return;
     }
 
     isRunningRef.current = true;
     setIsRunning(true);
+    setError('');
     setOutput(prev => prev + 'Running...\n');
 
     let stepCount = 0;
-    const maxSteps = 100000;
+    const maxSteps = 1000000;
 
     const execute = () => {
       if (!moduleRef.current || !isRunningRef.current) {
@@ -325,33 +241,32 @@ BRK`);
       }
 
       try {
-        const opcode = moduleRef.current.step();
-        stepCount++;
-
-        if (stepCount % 100 === 0) {
-          updateRegisters();
-          updateDisplay();
+        // Run a batch of instructions per tick for smoother speed control.
+        const batch = 50;
+        let opcode = 0;
+        for (let i = 0; i < batch && isRunningRef.current; i++) {
+          opcode = moduleRef.current.step();
+          stepCount++;
+          if (opcode === 0x00 || stepCount >= maxSteps) break;
         }
 
+        updateRegisters();
+        updateDisplay();
+
         if (opcode === 0x00) {
-          updateRegisters();
-          updateDisplay();
           setOutput(prev => prev + `Program completed after ${stepCount} steps\n`);
           isRunningRef.current = false;
           setIsRunning(false);
           return;
         }
-
         if (stepCount >= maxSteps) {
-          updateRegisters();
-          updateDisplay();
           setOutput(prev => prev + `Stopped after ${maxSteps} steps\n`);
           isRunningRef.current = false;
           setIsRunning(false);
           return;
         }
 
-        animationRef.current = setTimeout(execute, executionSpeed);
+        animationRef.current = setTimeout(execute, speedRef.current);
       } catch (err) {
         setError('Runtime error: ' + err.message);
         isRunningRef.current = false;
@@ -365,9 +280,7 @@ BRK`);
   const reset = () => {
     isRunningRef.current = false;
     setIsRunning(false);
-    if (animationRef.current) {
-      clearTimeout(animationRef.current);
-    }
+    if (animationRef.current) clearTimeout(animationRef.current);
 
     if (moduleRef.current) {
       moduleRef.current.reset();
@@ -381,69 +294,38 @@ BRK`);
 
   const loadExample = (exampleName) => {
     const examples = {
-      'draw': `; Draw a smiley face
-LDA #$01
-STA $0248
-STA $024B
-LDA #$02
-STA $0388
-STA $0389
-STA $038A
-STA $038B
-BRK`,
-      'counter': `; Count from 0 to 10
-LDA #$00
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-ADC #$01
-BRK`,
-      'rainbow': `; Fill display with colors
-LDX #$00
-LDA #$00
-STA $0200
-INA
-STA $0201
-INA
-STA $0202
-INA
-STA $0203
-INA
-STA $0204
-INA
-STA $0205
-INA
-STA $0206
-INA
-STA $0207
-INA
-STA $0208
-INA
-STA $0209
-INA
-STA $020A
-INA
-STA $020B
-INA
-STA $020C
-INA
-STA $020D
-INA
-STA $020E
-INA
-STA $020F
-BRK`
+      'counter': `; Count from 1 to 10, store the result at $0200
+      LDX #$00
+loop: INX
+      TXA
+      STA $0200
+      CMP #$0A
+      BNE loop
+      BRK`,
+      'rainbow': `; Fill the first 16 pixels with colors 0-15
+      LDX #$00
+loop: TXA
+      STA $0200,X
+      INX
+      CPX #$10
+      BNE loop
+      BRK`,
+      'draw': `; Draw a simple smiley face
+      LDA #$0F
+      STA $0228
+      STA $022B
+      LDA #$05
+      STA $0308
+      STA $0309
+      STA $030A
+      STA $030B
+      BRK`
     };
 
     if (examples[exampleName]) {
       setCode(examples[exampleName]);
       setOutput(`Loaded example: ${exampleName}\n`);
+      setError('');
     }
   };
 
@@ -499,7 +381,7 @@ BRK`
                   Speed: {executionSpeed}ms
                   <input
                     type="range"
-                    min="10"
+                    min="1"
                     max="500"
                     value={executionSpeed}
                     onChange={(e) => setExecutionSpeed(Number(e.target.value))}
@@ -509,14 +391,14 @@ BRK`
               </div>
 
               <div style={{ padding: '0 1rem 1rem', background: '#2a2a2a', display: 'flex', gap: '0.5rem' }}>
-                <button onClick={() => loadExample('draw')} className="btn" style={{ flex: 1 }}>
-                  Draw
-                </button>
                 <button onClick={() => loadExample('counter')} className="btn" style={{ flex: 1 }}>
                   Counter
                 </button>
                 <button onClick={() => loadExample('rainbow')} className="btn" style={{ flex: 1 }}>
                   Rainbow
+                </button>
+                <button onClick={() => loadExample('draw')} className="btn" style={{ flex: 1 }}>
+                  Smiley
                 </button>
               </div>
 
@@ -530,6 +412,7 @@ BRK`
 
               <div className="panel-header">
                 <h3>Output</h3>
+                <small style={{ opacity: 0.7 }}>{instructionCount} bytes</small>
               </div>
               <pre className="output">{output}</pre>
 

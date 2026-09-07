@@ -8,23 +8,6 @@
 #include "registers.h"
 #include "operations.h"
 
-#ifdef __EMSCRIPTEN__
-  #define sleep_ns(x)
-  #define CLOCK_TIME 0
-#else
-  #include <time.h>
-  #include <unistd.h>
-  #define sleep_ns(x) { \
-      struct timespec ts; \
-      ts.tv_sec = 0; \
-      ts.tv_nsec = x; \
-      nanosleep(&ts, NULL); \
-  }
-  #ifndef CLOCK_TIME
-    #define CLOCK_TIME 1
-  #endif
-#endif
-
 void reset_cpu();
 
 byte read_byte(byte *address);

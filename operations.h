@@ -12,11 +12,6 @@ uint16_t read_address(uint16_t offset);
 byte read_pc();
 void set_pc(uint16_t value);
 
-void push_word(uint16_t value);
-uint16_t pull_word(void);
-void push_pc(void);
-uint16_t pull_pc(void);
-
 void SBC(byte *addr);
 void ORA(byte *addr);
 void AND(byte *addr);
@@ -44,8 +39,8 @@ void CPX(byte *addr);
 
 void push_to_stack(byte *registerptr);
 void pull_from_stack(byte *registerptr);
-void transfer_registers(byte *reg1,byte *reg2);
-void set_clear_flag(uint8_t shiftamt,uint8_t val);
+void transfer_registers(byte *reg1, byte *reg2);
+void set_clear_flag(uint8_t shiftamt, uint8_t val);
 
 void NOP();
 void BRK();
